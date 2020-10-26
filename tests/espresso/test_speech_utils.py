@@ -12,6 +12,7 @@ from collections import Counter
 
 import torch
 
+from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 from espresso.data import AsrDictionary
 
 import espresso.tools.utils as utils
@@ -29,7 +30,8 @@ class TestSpeechUtils(unittest.TestCase):
         d = AsrDictionary()
         d.non_lang_syms = non_lang_syms
         args = Namespace(bpe="characters_asr")
-        d.build_bpe(args)
+        cfg = convert_namespace_to_omegaconf(args)
+        d.build_bpe(cfg)
         for token in vocab:
             d.add_symbol(token)
         d.add_symbol("<space>")

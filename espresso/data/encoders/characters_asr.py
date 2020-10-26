@@ -4,27 +4,48 @@
 # LICENSE file in the root directory of this source tree.
 
 
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from fairseq.data.encoders import register_bpe
+from fairseq.dataclass import FairseqDataclass
+from fairseq.file_io import PathManager
+from omegaconf import II
 
 from espresso.tools.utils import tokenize
 
 
-@register_bpe('characters_asr')
+@dataclass
+class CharactersAsrConfig(FairseqDataclass):
+    space_symbol: Optional[str] = field(
+        default="<space>", metadata={"help": "space symbol"}
+    )
+    ends_with_space: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help": "whether to append <space> to the end of each tokenized sentence"
+        },
+    )
+    non_lang_syms: Optional[str] = II("task.non_lang_syms")
+
+
+@register_bpe("characters_asr", dataclass=CharactersAsrConfig)
 class CharactersAsr(object):
-
-    @staticmethod
-    def add_args(parser):
-        pass
-
-    def __init__(
-        self, args, space_symbol="<space>", ends_with_space=True,
-        non_lang_syms: Optional[List[str]] = None,
-    ):
-        self.space_symbol = space_symbol
-        self.ends_with_space = ends_with_space
-        self.non_lang_syms = non_lang_syms
+    def __init__(self, cfg):
+        self.space_symbol = cfg.space_symbol
+        self.ends_with_space = cfg.ends_with_space
+        if cfg.non_lang_syms is None:
+            self.non_lang_syms = None
+        else:
+            try:
+                with open(
+                    PathManager.get_local_path(cfg.non_lang_syms), "r", encoding="utf-8"
+                ) as fd:
+                    self.non_lang_syms = [x.rstrip() for x in fd.readlines()]
+            except FileNotFoundError as fnfe:
+                raise fnfe
+            except UnicodeError:
+                raise Exception("Incorrect encoding detected in {}".format(fd))
 
     def encode(self, x: str) -> str:
         y = tokenize(x, space=self.space_symbol, non_lang_syms=self.non_lang_syms)

@@ -7,6 +7,7 @@ import torch
 
 from fairseq.data import Dictionary, encoders
 from fairseq.file_io import PathManager
+from omegaconf import DictConfig
 
 # will automatically load modules defined from there
 from espresso.data import encoders as encoders_espresso
@@ -24,8 +25,9 @@ class AsrDictionary(Dictionary):
         space="<space>",
         extra_special_symbols=None,
     ):
-        self.bos_word, self.unk_word, self.pad_word, self.eos_word, self.space_word = \
+        self.bos_word, self.unk_word, self.pad_word, self.eos_word, self.space_word = (
             bos, unk, pad, eos, space
+        )
         self.symbols = []
         self.count = []
         self.indices = {}
@@ -78,12 +80,13 @@ class AsrDictionary(Dictionary):
             except UnicodeError:
                 raise Exception(
                     "Incorrect encoding detected in {}, please "
-                    "rebuild the dataset".format(f)
+                    "rebuild the dataset".format(fd)
                 )
 
             for sym in non_lang_syms:
-                assert d.index(sym) != d.unk(), \
-                    "{} in {} is not in the dictionary".format(sym, f_non_lang_syms)
+                assert (
+                    d.index(sym) != d.unk()
+                ), "{} in {} is not in the dictionary".format(sym, f_non_lang_syms)
             d.non_lang_syms = non_lang_syms
 
         return d
@@ -94,17 +97,13 @@ class AsrDictionary(Dictionary):
         t[-1] = self.eos()
         return t
 
-    def build_tokenizer(self, args):
-        self.tokenizer = encoders.build_tokenizer(args)
+    def build_tokenizer(self, cfg: DictConfig):
+        self.tokenizer = encoders.build_tokenizer(cfg)
 
-    def build_bpe(self, args):
-        if args.bpe == "characters_asr":
-            self.bpe = encoders.build_bpe(
-                args, space_symbol=self.space_word, ends_with_space=True,
-                non_lang_syms=self.non_lang_syms,
-            )
-        else:
-            self.bpe = encoders.build_bpe(args)
+    def build_bpe(self, cfg: DictConfig):
+        if cfg._name == "characters_asr":
+            cfg.space_symbol = self.space_word
+        self.bpe = encoders.build_bpe(cfg)
 
     def wordpiece_encode(self, x):
         if self.tokenizer is not None:
