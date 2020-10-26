@@ -210,19 +210,30 @@ class SpeechChunkTransformerEncoder(SpeechTransformerEncoder):
             args, conv_layers_before=conv_layers_before, input_size=input_size,
             transformer_context=transformer_context,
         )
-        receptive_field_radius = sum(conv.padding[0] for conv in conv_layers_before.convolutions) \
-            if conv_layers_before is not None else 0
+        receptive_field_radius = (
+            sum(conv.padding[0] for conv in conv_layers_before.convolutions)
+            if conv_layers_before is not None
+            else 0
+        )
         assert chunk_width is None or chunk_width > 0
-        assert (conv_layers_before is None and chunk_left_context >= 0) or \
-            (conv_layers_before is not None and chunk_left_context >= receptive_field_radius)
+        assert (
+            (conv_layers_before is None and chunk_left_context >= 0)
+            or (conv_layers_before is not None and chunk_left_context >= receptive_field_radius)
+        )
         self.out_chunk_begin = self.output_lengths(chunk_left_context + 1) - 1
-        self.out_chunk_end = self.output_lengths(chunk_left_context + chunk_width) \
-            if chunk_width is not None else None
+        self.out_chunk_end = (
+            self.output_lengths(chunk_left_context + chunk_width)
+            if chunk_width is not None
+            else None
+        )
         self.training_stage = training_stage
 
         # only for encoder-only model
-        self.fc_out = Linear(args.encoder_embed_dim, num_targets, dropout=self.dropout_module.p) \
-            if num_targets is not None else None
+        self.fc_out = (
+            Linear(args.encoder_embed_dim, num_targets, dropout=self.dropout_module.p)
+            if num_targets is not None
+            else None
+        )
 
     def forward(
         self,

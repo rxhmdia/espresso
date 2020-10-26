@@ -36,13 +36,21 @@ logger = logging.getLogger(__name__)
 
 
 def get_asr_dataset_from_json(
-    data_path, split, dictionary,
-    combine, upsample_primary,
-    num_buckets=0, shuffle=True,
+    data_path,
+    split,
+    dictionary,
+    combine,
+    upsample_primary,
+    num_buckets=0,
+    shuffle=True,
     pad_to_multiple=1,
     lf_mmi=True,
-    seed=1, specaugment_config=None,
-    chunk_width=None, chunk_left_context=None, chunk_right_context=None, label_delay=0,
+    seed=1,
+    specaugment_config=None,
+    chunk_width=None,
+    chunk_left_context=None,
+    chunk_right_context=None,
+    label_delay=0,
 ):
     """
     Parse data json and create dataset.
@@ -72,7 +80,9 @@ def get_asr_dataset_from_json(
             if k > 0:
                 break
             else:
-                raise FileNotFoundError("Dataset not found: {}".format(data_json_path))
+                raise FileNotFoundError(
+                    "Dataset not found: {}".format(data_json_path)
+                )
 
         with open(data_json_path, "rb") as f:
             loaded_json = json.load(f, object_pairs_hook=OrderedDict)
@@ -103,9 +113,12 @@ def get_asr_dataset_from_json(
         else:  # cross-entropy
             if len(alignments) > 0:
                 assert len(utt_ids) == len(alignments)
-                tgt_datasets.append(AliScpCachedDataset(
-                    utt_ids, alignments, utt2num_frames=utt2num_frames, ordered_prefetch=True
-                ))
+                tgt_datasets.append(
+                    AliScpCachedDataset(
+                        utt_ids, alignments, utt2num_frames=utt2num_frames,
+                        ordered_prefetch=True,
+                    )
+                )
 
         if len(text) > 0:
             assert len(utt_ids) == len(text)
@@ -144,8 +157,10 @@ def get_asr_dataset_from_json(
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
     if lf_mmi:
         return AsrChainDataset(
-            src_dataset, src_dataset.sizes,
-            tgt_dataset, tgt_dataset_sizes,
+            src_dataset,
+            src_dataset.sizes,
+            tgt_dataset,
+            tgt_dataset_sizes,
             text=text_dataset,
             num_buckets=num_buckets,
             shuffle=shuffle,
@@ -153,15 +168,20 @@ def get_asr_dataset_from_json(
         )
     else:
         return AsrXentDataset(
-            src_dataset, src_dataset.sizes,
-            tgt_dataset, tgt_dataset_sizes,
+            src_dataset,
+            src_dataset.sizes,
+            tgt_dataset,
+            tgt_dataset_sizes,
             text=text_dataset,
             num_buckets=num_buckets,
             shuffle=shuffle,
             pad_to_multiple=pad_to_multiple,
-            seed=seed, chunk_width=chunk_width,
-            chunk_left_context=chunk_left_context, chunk_right_context=chunk_right_context,
-            label_delay=label_delay, random_chunking=(split == "train" and chunk_width is not None),
+            seed=seed,
+            chunk_width=chunk_width,
+            chunk_left_context=chunk_left_context,
+            chunk_right_context=chunk_right_context,
+            label_delay=label_delay,
+            random_chunking=(split == "train" and chunk_width is not None),
         )
 
 
@@ -278,10 +298,11 @@ class SpeechRecognitionHybridTask(FairseqTask):
         if args.initial_state_prior_file is not None:  # only relevant for Xent training, used in models
             self.initial_state_prior = kaldi_io.read_vec_flt(args.initial_state_prior_file)
             self.initial_state_prior = torch.from_numpy(self.initial_state_prior)
-            assert self.initial_state_prior.size(0) == self.num_targets, \
-                "length of initial_state_prior ({}) != num_targets ({})".format(
-                    self.initial_state_prior.size(0), self.num_targets
-                )
+            assert (
+                self.initial_state_prior.size(0) == self.num_targets
+            ), "length of initial_state_prior ({}) != num_targets ({})".format(
+                self.initial_state_prior.size(0), self.num_targets
+            )
         self.state_prior_update_interval = args.state_prior_update_interval
         if self.state_prior_update_interval is None and self.initial_state_prior is not None:
             logger.info("state prior will not be updated during training")
@@ -305,8 +326,11 @@ class SpeechRecognitionHybridTask(FairseqTask):
         """
         # load dictionaries
         dict_path = args.dict
-        dictionary = cls.load_dictionary(dict_path, non_lang_syms=args.non_lang_syms) if \
-            dict_path is not None else None
+        dictionary = (
+            cls.load_dictionary(dict_path, non_lang_syms=args.non_lang_syms)
+            if dict_path is not None
+            else None
+        )
         if dictionary is not None:
             logger.info("dictionary: {} types".format(len(dictionary)))
         return cls(args, dictionary)
@@ -325,16 +349,22 @@ class SpeechRecognitionHybridTask(FairseqTask):
         data_path = paths[(epoch - 1) % len(paths)]
 
         self.datasets[split] = get_asr_dataset_from_json(
-            data_path, split, self.dictionary,
+            data_path,
+            split,
+            self.dictionary,
             combine=combine,
             upsample_primary=self.args.upsample_primary,
             num_buckets=self.args.num_batch_buckets,
             shuffle=(split != getattr(self.args, "gen_subset", None)),
             pad_to_multiple=self.args.required_seq_len_multiple,
             lf_mmi=(self.args.criterion == "lattice_free_mmi"),
-            seed=self.args.seed, specaugment_config=self.specaugment_config,
-            chunk_width=None if self.training_stage and split in self.args.valid_subset.split(",") else self.chunk_width,
-            chunk_left_context=self.chunk_left_context, chunk_right_context=self.chunk_right_context,
+            seed=self.args.seed,
+            specaugment_config=self.specaugment_config,
+            chunk_width=None if self.training_stage
+            and split in self.args.valid_subset.split(",")
+            else self.chunk_width,
+            chunk_left_context=self.chunk_left_context,
+            chunk_right_context=self.chunk_right_context,
             label_delay=self.label_delay,
         )
 
@@ -353,6 +383,7 @@ class SpeechRecognitionHybridTask(FairseqTask):
                 "--score-reference is not applicable to speech recognition, ignoring it."
             )
         from espresso.tools.generate_log_probs_for_decoding import GenerateLogProbsForDecoding
+
         apply_log_softmax = getattr(args, "apply_log_softmax", False)
         return GenerateLogProbsForDecoding(models, apply_log_softmax=apply_log_softmax)
 

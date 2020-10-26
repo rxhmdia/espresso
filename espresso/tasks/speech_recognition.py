@@ -28,11 +28,16 @@ logger = logging.getLogger(__name__)
 
 
 def get_asr_dataset_from_json(
-    data_path, split, tgt_dict,
-    combine, upsample_primary,
-    num_buckets=0, shuffle=True,
+    data_path,
+    split,
+    tgt_dict,
+    combine,
+    upsample_primary,
+    num_buckets=0,
+    shuffle=True,
     pad_to_multiple=1,
-    seed=1, specaugment_config=None,
+    seed=1,
+    specaugment_config=None,
 ):
     """
     Parse data json and create dataset.
@@ -58,7 +63,9 @@ def get_asr_dataset_from_json(
             if k > 0:
                 break
             else:
-                raise FileNotFoundError("Dataset not found: {}".format(data_json_path))
+                raise FileNotFoundError(
+                    "Dataset not found: {}".format(data_json_path)
+                )
 
         with open(data_json_path, "rb") as f:
             loaded_json = json.load(f, object_pairs_hook=OrderedDict)
@@ -97,8 +104,9 @@ def get_asr_dataset_from_json(
         tgt_dataset = tgt_datasets[0] if len(tgt_datasets) > 0 else None
     else:
         for i in range(1, len(src_datasets)):
-            assert feat_dim == src_datasets[i].feat_dim, \
-                "feature dimension does not match across multiple json files"
+            assert (
+                feat_dim == src_datasets[i].feat_dim
+            ), "feature dimension does not match across multiple json files"
         sample_ratios = [1] * len(src_datasets)
         sample_ratios[0] = upsample_primary
         src_dataset = ConcatDataset(src_datasets, sample_ratios)
@@ -109,8 +117,10 @@ def get_asr_dataset_from_json(
 
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
     return AsrDataset(
-        src_dataset, src_dataset.sizes,
-        tgt_dataset, tgt_dataset_sizes,
+        src_dataset,
+        src_dataset.sizes,
+        tgt_dataset,
+        tgt_dataset_sizes,
         tgt_dict,
         left_pad_source=False,
         left_pad_target=False,
@@ -242,7 +252,9 @@ class SpeechRecognitionEspressoTask(FairseqTask):
         data_path = paths[(epoch - 1) % len(paths)]
 
         self.datasets[split] = get_asr_dataset_from_json(
-            data_path, split, self.tgt_dict,
+            data_path,
+            split,
+            self.tgt_dict,
             combine=combine,
             upsample_primary=self.args.upsample_primary,
             num_buckets=self.args.num_batch_buckets,
@@ -271,13 +283,17 @@ class SpeechRecognitionEspressoTask(FairseqTask):
 
     def build_dataset_for_inference(self, src_tokens, src_lengths, constraints=None):
         return AsrDataset(
-            src_tokens, src_lengths, dictionary=self.target_dictionary, constraints=constraints,
+            src_tokens,
+            src_lengths,
+            dictionary=self.target_dictionary,
+            constraints=constraints,
         )
 
     def build_model(self, args):
         model = super().build_model(args)
         # build the greedy decoder for validation with WER
         from espresso.tools.simple_greedy_decoder import SimpleGreedyDecoder
+
         self.decoder_for_validation = SimpleGreedyDecoder(
             [model], self.target_dictionary, for_validation=True,
         )

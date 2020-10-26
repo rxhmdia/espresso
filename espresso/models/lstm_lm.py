@@ -100,7 +100,9 @@ class LSTMLanguageModelEspresso(FairseqLanguageModel):
         if getattr(args, "max_target_positions", None) is not None:
             max_target_positions = args.max_target_positions
         else:
-            max_target_positions = getattr(args, "tokens_per_sample", DEFAULT_MAX_TARGET_POSITIONS)
+            max_target_positions = getattr(
+                args, "tokens_per_sample", DEFAULT_MAX_TARGET_POSITIONS
+            )
 
         def load_pretrained_embedding_from_file(embed_path, dictionary, embed_dim):
             num_embeddings = len(dictionary)
@@ -121,9 +123,7 @@ class LSTMLanguageModelEspresso(FairseqLanguageModel):
         pretrained_decoder_embed = None
         if args.decoder_embed_path:
             pretrained_decoder_embed = load_pretrained_embedding_from_file(
-                args.decoder_embed_path,
-                dictionary,
-                args.decoder_embed_dim
+                args.decoder_embed_path, dictionary, args.decoder_embed_dim
             )
         # one last double check of parameter combinations
         if args.share_embed and (
@@ -150,7 +150,8 @@ class LSTMLanguageModelEspresso(FairseqLanguageModel):
             share_input_output_embed=args.share_embed,
             adaptive_softmax_cutoff=(
                 utils.eval_str_list(args.adaptive_softmax_cutoff, type=int)
-                if args.criterion == "adaptive_loss" else None
+                if args.criterion == "adaptive_loss"
+                else None
             ),
             max_target_positions=max_target_positions,
         )

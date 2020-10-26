@@ -12,7 +12,7 @@ import numpy as np
 
 import torch
 
-from fairseq.data import data_utils, FairseqDataset
+from fairseq.data import FairseqDataset, data_utils
 
 import espresso.tools.utils as speech_utils
 
@@ -48,12 +48,15 @@ def collate(samples, pad_to_length=None, pad_to_multiple=1, src_bucketed=False):
             raise ValueError("Invalid key.")
 
     id = torch.LongTensor([s["id"] for s in samples])
-    src_frames = merge("source", pad_to_length=pad_to_length["source"] if pad_to_length is not None else None)
+    src_frames = merge(
+        "source",
+        pad_to_length=pad_to_length["source"] if pad_to_length is not None else None,
+    )
     # sort by descending source length
     if pad_to_length is not None or src_bucketed:
-        src_lengths = torch.IntTensor([
-            s["source"].ne(0.0).any(dim=1).int().sum() for s in samples
-        ])
+        src_lengths = torch.IntTensor(
+            [s["source"].ne(0.0).any(dim=1).int().sum() for s in samples]
+        )
     else:
         src_lengths = torch.IntTensor([s["source"].size(0) for s in samples])
     src_lengths, sort_order = src_lengths.sort(descending=True)
@@ -172,8 +175,15 @@ class AsrChainDataset(FairseqDataset):
     """
 
     def __init__(
-        self, src, src_sizes, tgt=None, tgt_sizes=None, text=None, shuffle=True,
-        num_buckets=0, pad_to_multiple=1,
+        self,
+        src,
+        src_sizes,
+        tgt=None,
+        tgt_sizes=None,
+        text=None,
+        shuffle=True,
+        num_buckets=0,
+        pad_to_multiple=1,
     ):
         self.src = src
         self.tgt = tgt
@@ -196,10 +206,15 @@ class AsrChainDataset(FairseqDataset):
                 "Removed {} examples due to empty numerator graphs or missing entries, "
                 "{} remaining".format(num_removed, num_after_matching)
             )
-        self.sizes = np.vstack((self.src_sizes, self.tgt_sizes)).T if self.tgt_sizes is not None else self.src_sizes
+        self.sizes = (
+            np.vstack((self.src_sizes, self.tgt_sizes)).T
+            if self.tgt_sizes is not None
+            else self.src_sizes
+        )
 
         if num_buckets > 0:
             from espresso.data import FeatBucketPadLengthDataset
+
             self.src = FeatBucketPadLengthDataset(
                 self.src,
                 sizes=self.src_sizes,
@@ -215,8 +230,7 @@ class AsrChainDataset(FairseqDataset):
             num_tokens = np.vectorize(self.num_tokens, otypes=[np.long])
             self.bucketed_num_tokens = num_tokens(np.arange(len(self.src)))
             self.buckets = [
-                (None, num_tokens)
-                for num_tokens in np.unique(self.bucketed_num_tokens)
+                (None, num_tokens) for num_tokens in np.unique(self.bucketed_num_tokens)
             ]
         else:
             self.buckets = None
@@ -327,7 +341,10 @@ class AsrChainDataset(FairseqDataset):
     def size(self, index):
         """Return an example's size as a float or tuple. This value is used when
         filtering a dataset with ``--max-positions``."""
-        return (self.src_sizes[index], self.tgt_sizes[index] if self.tgt_sizes is not None else 0)
+        return (
+            self.src_sizes[index],
+            self.tgt_sizes[index] if self.tgt_sizes is not None else 0,
+        )
 
     def ordered_indices(self):
         """Return an ordered list of indices. Batches will be constructed based
@@ -339,9 +356,7 @@ class AsrChainDataset(FairseqDataset):
         if self.buckets is None:
             # sort by target length, then source length
             if self.tgt_sizes is not None:
-                indices = indices[
-                    np.argsort(self.tgt_sizes[indices], kind="mergesort")
-                ]
+                indices = indices[np.argsort(self.tgt_sizes[indices], kind="mergesort")]
             return indices[np.argsort(self.src_sizes[indices], kind="mergesort")]
         else:
             # sort by bucketed_num_tokens, which is padded_src_len
@@ -358,7 +373,7 @@ class AsrChainDataset(FairseqDataset):
         self.src.prefetch(indices)
 
     def filter_indices_by_size(self, indices, max_sizes):
-        """ Filter a list of sample indices. Remove those that are longer
+        """Filter a list of sample indices. Remove those that are longer
             than specified in max_sizes.
 
         Args:

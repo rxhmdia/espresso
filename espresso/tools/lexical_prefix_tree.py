@@ -43,8 +43,10 @@ def lexical_prefix_tree(
     for widx in range(len(word_dict)):
         if widx not in special_symbols:  # skip <pad>, <eos>, <unk>
             # tokenize a word into a list of subwords
-            subwords = subword_tokenizer(word_dict[widx]) \
-                if subword_tokenizer is not None else list(word_dict[widx])
+            subwords = (
+                subword_tokenizer(word_dict[widx]) if subword_tokenizer is not None else
+                list(word_dict[widx]
+            )
             if any(subword_dict.index(s) == subword_dict.unk() for s in subwords):
                 # skip words containing any unknown subwords
                 continue

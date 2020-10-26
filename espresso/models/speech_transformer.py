@@ -246,7 +246,9 @@ class SpeechTransformerEncoder(TransformerEncoder):
         super(TransformerEncoder, self).__init__(None)  # no src dictionary
         self.register_buffer("version", torch.Tensor([3]))
 
-        self.dropout_module = FairseqDropout(args.dropout, module_name=self.__class__.__name__)
+        self.dropout_module = FairseqDropout(
+            args.dropout, module_name=self.__class__.__name__
+        )
         self.encoder_layerdrop = args.encoder_layerdrop
 
         embed_dim = args.encoder_embed_dim

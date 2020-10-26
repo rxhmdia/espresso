@@ -85,7 +85,7 @@ def temporal_label_smoothing_prob_mask(
     prob_mask[:, :, padding_index] = 0  # clear cumulative count on <pad>
     prob_mask = prob_mask.float()  # convert to float
     sum_prob = prob_mask.sum(-1, keepdim=True)
-    sum_prob[sum_prob.squeeze(-1).eq(0.)] = 1.  # to deal with the "division by 0" problem
+    sum_prob[sum_prob.squeeze(-1).eq(0.0)] = 1.0  # to deal with the "division by 0" problem
     prob_mask = prob_mask.div_(sum_prob).view(-1, prob_mask.size(-1))
     return prob_mask
 
@@ -109,8 +109,8 @@ def label_smoothed_nll_loss(
         raise ValueError("Unsupported smoothing type: {}".format(smoothing_type))
     if ignore_index is not None:
         pad_mask = target.eq(ignore_index)
-        nll_loss.masked_fill_(pad_mask, 0.)
-        smooth_loss.masked_fill_(pad_mask, 0.)
+        nll_loss.masked_fill_(pad_mask, 0.0)
+        smooth_loss.masked_fill_(pad_mask, 0.0)
     else:
         nll_loss = nll_loss.squeeze(-1)
         smooth_loss = smooth_loss.squeeze(-1)
@@ -118,7 +118,7 @@ def label_smoothed_nll_loss(
         nll_loss = nll_loss.sum()
         smooth_loss = smooth_loss.sum()
     eps_i = epsilon / lprobs.size(-1) if smoothing_type == "uniform" else epsilon
-    loss = (1. - epsilon) * nll_loss + eps_i * smooth_loss
+    loss = (1.0 - epsilon) * nll_loss + eps_i * smooth_loss
     return loss, nll_loss
 
 
@@ -126,9 +126,15 @@ def label_smoothed_nll_loss(
 class LabelSmoothedCrossEntropyV2Criterion(LabelSmoothedCrossEntropyCriterion):
 
     def __init__(
-        self, task, sentence_avg, label_smoothing, smoothing_type,
-        print_training_sample_interval, unigram_pseudo_count,
-        ignore_prefix_size=0, report_accuracy=False,
+        self,
+        task,
+        sentence_avg,
+        label_smoothing,
+        smoothing_type,
+        print_training_sample_interval,
+        unigram_pseudo_count,
+        ignore_prefix_size=0,
+        report_accuracy=False,
     ):
         super().__init__(
             task, sentence_avg, label_smoothing,
@@ -212,8 +218,13 @@ class LabelSmoothedCrossEntropyV2Criterion(LabelSmoothedCrossEntropyCriterion):
             padding_index=self.padding_idx,
         ) if smoothing_type == "temporal" else None
         loss, nll_loss = label_smoothed_nll_loss(
-            lprobs, target, self.eps, ignore_index=self.padding_idx, reduce=reduce,
-            smoothing_type=smoothing_type, prob_mask=prob_mask,
+            lprobs,
+            target,
+            self.eps,
+            ignore_index=self.padding_idx,
+            reduce=reduce,
+            smoothing_type=smoothing_type,
+            prob_mask=prob_mask,
             unigram_tensor=self.unigram_tensor,
         )
         return loss, nll_loss, lprobs
