@@ -259,7 +259,7 @@ class SpeechTransformerEncoder(TransformerEncoder):
 
         self.embed_positions = (
             PositionalEmbedding(
-                self.output_lengths(args.max_source_positions),
+                self.output_lengths(self.max_source_positions),
                 embed_dim,
                 0,
                 learned=args.encoder_learned_pos,
@@ -581,6 +581,14 @@ def base_architecture(args):
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     args.layernorm_embedding = getattr(args, "layernorm_embedding", False)
     args.tie_adaptive_weights = getattr(args, "tie_adaptive_weights", False)
+
+    args.encoder_layers_to_keep = getattr(args, "encoder_layers_to_keep", None)
+    args.decoder_layers_to_keep = getattr(args, "decoder_layers_to_keep", None)
+    args.encoder_layerdrop = getattr(args, "encoder_layerdrop", 0)
+    args.decoder_layerdrop = getattr(args, "decoder_layerdrop", 0)
+    args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
+    args.quant_noise_pq_block_size = getattr(args, "quant_noise_pq_block_size", 8)
+    args.quant_noise_scalar = getattr(args, "quant_noise_scalar", 0)
 
 
 @register_model_architecture("speech_transformer", "speech_transformer_wsj")

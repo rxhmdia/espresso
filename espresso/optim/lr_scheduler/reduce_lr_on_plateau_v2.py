@@ -3,16 +3,17 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+from argparse import Namespace
 from dataclasses import dataclass, field
-from omegaconf import II
 from typing import List
 
 import torch.optim.lr_scheduler
 
 from fairseq.dataclass import FairseqDataclass
-from fairseq.dataclass.utils import gen_parser_from_dataclass
+from fairseq.dataclass.utils import convert_namespace_to_omegaconf, gen_parser_from_dataclass
 from fairseq.optim.lr_scheduler import register_lr_scheduler
 from fairseq.optim.lr_scheduler.reduce_lr_on_plateau import ReduceLROnPlateau
+from omegaconf import II, DictConfig
 
 
 @dataclass
@@ -40,7 +41,7 @@ class ReduceLROnPlateauV2Config(FairseqDataclass):
     warmup_init_lr: float = field(
         default=-1,
         metadata={
-            "help": "initial learning rate during warmup phase; default is args.lr"
+            "help": "initial learning rate during warmup phase; default is cfg.lr"
         },
     )
     final_lr_scale: float = field(
@@ -52,28 +53,29 @@ class ReduceLROnPlateauV2Config(FairseqDataclass):
         metadata={"help": "start to reduce lr from the specified epoch"},
     )
     # TODO common vars at parent class
-    lr: List[float] = II("params.optimization.lr")
+    lr: List[float] = II("optimization.lr")
 
 
 @register_lr_scheduler("reduce_lr_on_plateau_v2", dataclass=ReduceLROnPlateauV2Config)
 class ReduceLROnPlateauV2(ReduceLROnPlateau):
     """Decay the LR by a factor every time the validation loss plateaus, starting
-    from the epoch specified as args.start_reduce_lr_epoch.
+    from the epoch specified as cfg.start_reduce_lr_epoch.
 
     We also support specifying a final lr which will be kept until the max number
     of epochs is reached.
     """
 
-    def __init__(self, args, optimizer):
-        super().__init__(args, optimizer)
+    def __init__(self, cfg: DictConfig, fairseq_optimizer):
+        super().__init__(cfg, fairseq_optimizer)
 
+        self.cfg = convert_namespace_to_omegaconf(cfg) if isinstance(cfg, Namespace) else cfg
         self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer.optimizer,
-            patience=args.lr_patience,
-            factor=args.lr_shrink,
-            mode="max" if args.maximize_best_checkpoint_metric else "min",
-            threshold=args.lr_threshold,
-            min_lr=args.final_lr_scale * args.lr[0],
+            patience=cfg.lr_patience,
+            factor=cfg.lr_shrink,
+            mode="max" if cfg.maximize_best_checkpoint_metric else "min",
+            threshold=cfg.lr_threshold,
+            min_lr=cfg.final_lr_scale * cfg.lr[0],
         )
 
     @classmethod
@@ -83,8 +85,8 @@ class ReduceLROnPlateauV2(ReduceLROnPlateau):
             gen_parser_from_dataclass(parser, dc())
 
     def step(self, epoch, val_loss=None):
-        if epoch < self.args.start_reduce_lr_epoch:
+        if epoch < self.cfg.start_reduce_lr_epoch:
             self.lr_scheduler.last_epoch = epoch
-            self.optimizer.set_lr(self.args.lr[0])
+            self.optimizer.set_lr(self.cfg.lr[0])
             return self.optimizer.get_lr()
         return super().step(epoch, val_loss)

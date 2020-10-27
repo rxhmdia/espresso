@@ -125,13 +125,13 @@ class SpeechTdnnEncoderModel(FairseqEncoderModel):
         state_dict["state_prior"] = self.state_prior
         return state_dict
 
-    def load_state_dict(self, state_dict, strict=True, args=None):
+    def load_state_dict(self, state_dict, strict=True, model_cfg=None):
         state_dict_subset = state_dict.copy()
         self.state_prior = state_dict.get("state_prior", None)
         if "state_prior" in state_dict:
             self.state_prior = state_dict["state_prior"]
             del state_dict_subset["state_prior"]
-        super().load_state_dict(state_dict_subset, strict=strict, args=args)
+        super().load_state_dict(state_dict_subset, strict=strict, model_cfg=model_cfg)
 
 
 class TdnnBNReLU(nn.Module):

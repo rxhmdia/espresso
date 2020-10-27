@@ -15,6 +15,7 @@ from fairseq import utils
 from fairseq.data import BaseWrapperDataset, ConcatDataset
 from fairseq.logging import metrics
 from fairseq.tasks import FairseqTask, register_task
+from omegaconf import DictConfig
 
 from espresso.data import (
     AsrDataset,
@@ -205,14 +206,14 @@ class SpeechRecognitionEspressoTask(FairseqTask):
         """
         raise NotImplementedError
 
-    def __init__(self, args, tgt_dict, word_dict=None):
-        super().__init__(args)
+    def __init__(self, cfg: DictConfig, tgt_dict, word_dict=None):
+        super().__init__(cfg)
         self.tgt_dict = tgt_dict
-        self.tgt_dict.build_tokenizer(args)
-        self.tgt_dict.build_bpe(args)
+        self.tgt_dict.build_tokenizer(cfg)
+        self.tgt_dict.build_bpe(cfg)
         self.word_dict = word_dict
-        self.feat_in_channels = args.feat_in_channels
-        self.specaugment_config = args.specaugment_config
+        self.feat_in_channels = cfg.task.feat_in_channels
+        self.specaugment_config = cfg.task.specaugment_config
         torch.backends.cudnn.deterministic = True
         # Compansate for the removel of :func:`torch.rand()` from
         # :func:`fairseq.distributed_utils.distributed_init()` by fairseq,
@@ -220,23 +221,23 @@ class SpeechRecognitionEspressoTask(FairseqTask):
         torch.rand(1)
 
     @classmethod
-    def setup_task(cls, args, **kwargs):
+    def setup_task(cls, cfg: DictConfig, **kwargs):
         """Setup the task (e.g., load dictionaries).
 
         Args:
-            args (argparse.Namespace): parsed command-line arguments
+            cfg (omegaconf.DictConfig): parsed command-line arguments
         """
         # load dictionaries
-        dict_path = os.path.join(args.data, "dict.txt") if args.dict is None else args.dict
-        tgt_dict = cls.load_dictionary(dict_path, non_lang_syms=args.non_lang_syms)
+        dict_path = os.path.join(cfg.task.data, "dict.txt") if cfg.task.dict is None else cfg.task.dict
+        tgt_dict = cls.load_dictionary(dict_path, non_lang_syms=cfg.task.non_lang_syms)
         logger.info("dictionary: {} types".format(len(tgt_dict)))
-        if args.word_dict is not None:
-            word_dict = cls.load_dictionary(args.word_dict)
+        if cfg.task.word_dict is not None:
+            word_dict = cls.load_dictionary(cfg.task.word_dict)
             logger.info("word dictionary: {} types".format(len(word_dict)))
-            return cls(args, tgt_dict, word_dict)
+            return cls(cfg, tgt_dict, word_dict)
 
         else:
-            return cls(args, tgt_dict)
+            return cls(cfg, tgt_dict)
 
     def load_dataset(self, split, epoch=1, combine=False, **kwargs):
         """Load a given dataset split.
@@ -244,9 +245,9 @@ class SpeechRecognitionEspressoTask(FairseqTask):
         Args:
             split (str): name of the split (e.g., train, valid, test)
         """
-        paths = utils.split_paths(self.args.data)
+        paths = utils.split_paths(self.cfg.task.data)
         assert len(paths) > 0
-        if split != getattr(self.args, "train_subset", None):
+        if split != self.cfg.dataset.train_subset:
             # if not training data set, use the first shard for valid and test
             paths = paths[:1]
         data_path = paths[(epoch - 1) % len(paths)]
@@ -256,11 +257,11 @@ class SpeechRecognitionEspressoTask(FairseqTask):
             split,
             self.tgt_dict,
             combine=combine,
-            upsample_primary=self.args.upsample_primary,
-            num_buckets=self.args.num_batch_buckets,
-            shuffle=(split != getattr(self.args, "gen_subset", None)),
-            pad_to_multiple=self.args.required_seq_len_multiple,
-            seed=self.args.seed,
+            upsample_primary=self.cfg.task.upsample_primary,
+            num_buckets=self.cfg.task.num_batch_buckets,
+            shuffle=(split != self.cfg.dataset.gen_subset),
+            pad_to_multiple=self.cfg.dataset.required_seq_len_multiple,
+            seed=self.cfg.common.seed,
             specaugment_config=self.specaugment_config,
         )
 
@@ -289,8 +290,8 @@ class SpeechRecognitionEspressoTask(FairseqTask):
             constraints=constraints,
         )
 
-    def build_model(self, args):
-        model = super().build_model(args)
+    def build_model(self, cfg: DictConfig):
+        model = super().build_model(cfg)
         # build the greedy decoder for validation with WER
         from espresso.tools.simple_greedy_decoder import SimpleGreedyDecoder
 
@@ -320,7 +321,7 @@ class SpeechRecognitionEspressoTask(FairseqTask):
 
     def max_positions(self):
         """Return the max sentence length allowed by the task."""
-        return (self.args.max_source_positions, self.args.max_target_positions)
+        return (self.cfg.max_source_positions, self.cfg.max_target_positions)
 
     @property
     def target_dictionary(self):
@@ -335,7 +336,7 @@ class SpeechRecognitionEspressoTask(FairseqTask):
     def _inference_with_wer(self, decoder, sample, model):
         from espresso.tools import wer
 
-        scorer = wer.Scorer(self.target_dictionary, wer_output_filter=self.args.wer_output_filter)
+        scorer = wer.Scorer(self.target_dictionary, wer_output_filter=self.cfg.task.wer_output_filter)
         tokens, lprobs, _ = decoder.decode([model], sample)
         pred = tokens[:, 1:].data.cpu()  # bsz x len
         target = sample["target"]

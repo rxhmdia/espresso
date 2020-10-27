@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from dataclasses import dataclass, field
-from omegaconf import II
 import logging
 import numpy as np
 
@@ -16,6 +15,7 @@ from fairseq.criterions.label_smoothed_cross_entropy import LabelSmoothedCrossEn
 from fairseq.data import data_utils
 from fairseq.dataclass import ChoiceEnum, FairseqDataclass
 from fairseq.dataclass.utils import gen_parser_from_dataclass
+from omegaconf import II
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ LABEL_SMOOTHING_CHOICES = ChoiceEnum(["uniform", "unigram", "temporal"])
 
 @dataclass
 class LabelSmoothedCrossEntropyV2CriterionConfig(FairseqDataclass):
-    sentence_avg: bool = II("params.optimization.sentence_avg")
+    sentence_avg: bool = II("optimization.sentence_avg")
     label_smoothing: float = field(
         default=0.0,
         metadata={

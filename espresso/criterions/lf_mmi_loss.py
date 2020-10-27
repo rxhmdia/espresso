@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from dataclasses import dataclass, field
-from omegaconf import II
 import logging
 import math
 
@@ -14,6 +13,7 @@ from fairseq import utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 from fairseq.dataclass import FairseqDataclass
 from fairseq.logging import metrics
+from omegaconf import II
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LatticeFreeMMICriterionConfig(FairseqDataclass):
-    sentence_avg: bool = II("params.optimization.sentence_avg")
+    sentence_avg: bool = II("optimization.sentence_avg")
     denominator_fst_path: str = field(
         default=None, metadata={"help": "path to the denominator fst file"}
     )

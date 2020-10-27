@@ -372,6 +372,12 @@ def base_architecture(args):
     args.adaptive_input = getattr(args, "adaptive_input", False)
     args.layernorm_embedding = getattr(args, "layernorm_embedding", False)
 
+    args.encoder_layers_to_keep = getattr(args, "encoder_layers_to_keep", None)
+    args.encoder_layerdrop = getattr(args, "encoder_layerdrop", 0)
+    args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
+    args.quant_noise_pq_block_size = getattr(args, "quant_noise_pq_block_size", 8)
+    args.quant_noise_scalar = getattr(args, "quant_noise_scalar", 0)
+
 
 @register_model_architecture("speech_transformer_encoder_model", "speech_transformer_encoder_model_wsj")
 def speech_transformer_encoder_wsj(args):

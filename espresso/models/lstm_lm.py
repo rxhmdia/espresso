@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from dataclasses import dataclass, field
-from omegaconf import II
 from typing import Optional
 
 from fairseq import utils
@@ -15,6 +14,7 @@ from fairseq.models import (
     register_model_architecture,
 )
 from fairseq.models.lstm import Embedding
+from omegaconf import II
 
 from espresso.models.speech_lstm import SpeechLSTMDecoder
 from espresso.tasks.speech_recognition import SpeechRecognitionEspressoTask
@@ -82,7 +82,7 @@ class LSTMLanguageModelEspressoConfig(FairseqDataclass):
     add_bos_token: bool = II("task.add_bos_token")
     tokens_per_sample: int = II("task.tokens_per_sample")
     max_target_positions: Optional[int] = II("task.max_target_positions")
-    tpu: bool = II("params.common.tpu")
+    tpu: bool = II("common.tpu")
 
 
 @register_model("lstm_lm_espresso", dataclass=LSTMLanguageModelEspressoConfig)

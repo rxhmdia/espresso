@@ -13,8 +13,9 @@ import torch
 
 from fairseq import utils
 from fairseq.data import BaseWrapperDataset, ConcatDataset
-
+from fairseq.dataclass.configs import GenerationConfig
 from fairseq.tasks import FairseqTask, register_task
+from omegaconf import DictConfig
 
 from espresso.data import (
     AliScpCachedDataset,
@@ -285,55 +286,57 @@ class SpeechRecognitionHybridTask(FairseqTask):
         """
         raise NotImplementedError
 
-    def __init__(self, args, dictionary):
-        super().__init__(args)
+    def __init__(self, cfg: DictConfig, dictionary):
+        super().__init__(cfg)
         self.dictionary = dictionary
-        self.feat_in_channels = args.feat_in_channels
-        self.specaugment_config = args.specaugment_config
-        self.num_targets = args.num_targets
-        self.training_stage = hasattr(args, "valid_subset")
+        self.feat_in_channels = cfg.task.feat_in_channels
+        self.specaugment_config = cfg.task.specaugment_config
+        self.num_targets = cfg.task.num_targets
+        self.training_stage = (
+            not hasattr(cfg, "optimization") or not hasattr(cfg.optimization, "max_epoch")
+        )  # a hack
 
         # the following attributes are related to state_prior estimate
         self.initial_state_prior = None
-        if args.initial_state_prior_file is not None:  # only relevant for Xent training, used in models
-            self.initial_state_prior = kaldi_io.read_vec_flt(args.initial_state_prior_file)
+        if cfg.task.initial_state_prior_file is not None:  # only relevant for Xent training, used in models
+            self.initial_state_prior = kaldi_io.read_vec_flt(cfg.task.initial_state_prior_file)
             self.initial_state_prior = torch.from_numpy(self.initial_state_prior)
             assert (
                 self.initial_state_prior.size(0) == self.num_targets
             ), "length of initial_state_prior ({}) != num_targets ({})".format(
                 self.initial_state_prior.size(0), self.num_targets
             )
-        self.state_prior_update_interval = args.state_prior_update_interval
+        self.state_prior_update_interval = cfg.task.state_prior_update_interval
         if self.state_prior_update_interval is None and self.initial_state_prior is not None:
             logger.info("state prior will not be updated during training")
-        self.state_prior_update_smoothing = args.state_prior_update_smoothing
+        self.state_prior_update_smoothing = cfg.task.state_prior_update_smoothing
         self.averaged_state_post = None  # state poterior will be saved here before commited as new state prior
 
         # the following 4 options are for chunk-wise training/test (including Xent and LF-MMI)
-        self.chunk_width = args.chunk_width
-        self.chunk_left_context = args.chunk_left_context
-        self.chunk_right_context = args.chunk_right_context
-        self.label_delay = args.label_delay  # only for chunk-wise Xent training
+        self.chunk_width = cfg.task.chunk_width
+        self.chunk_left_context = cfg.task.chunk_left_context
+        self.chunk_right_context = cfg.task.chunk_right_context
+        self.label_delay = cfg.task.label_delay  # only for chunk-wise Xent training
 
         torch.backends.cudnn.deterministic = True
 
     @classmethod
-    def setup_task(cls, args, **kwargs):
+    def setup_task(cls, cfg: DictConfig, **kwargs):
         """Setup the task (e.g., load dictionaries).
 
         Args:
-            args (argparse.Namespace): parsed command-line arguments
+            cfg (omegaconf.DictConfig): parsed command-line arguments
         """
         # load dictionaries
-        dict_path = args.dict
+        dict_path = cfg.task.dict
         dictionary = (
-            cls.load_dictionary(dict_path, non_lang_syms=args.non_lang_syms)
+            cls.load_dictionary(dict_path, non_lang_syms=cfg.task.non_lang_syms)
             if dict_path is not None
             else None
         )
         if dictionary is not None:
             logger.info("dictionary: {} types".format(len(dictionary)))
-        return cls(args, dictionary)
+        return cls(cfg, dictionary)
 
     def load_dataset(self, split, epoch=1, combine=False, **kwargs):
         """Load a given dataset split.
@@ -341,9 +344,9 @@ class SpeechRecognitionHybridTask(FairseqTask):
         Args:
             split (str): name of the split (e.g., train, valid, test)
         """
-        paths = utils.split_paths(self.args.data)
+        paths = utils.split_paths(self.cfg.task.data)
         assert len(paths) > 0
-        if split != getattr(self.args, "train_subset", None):
+        if split != self.cfg.dataset.train_subset:
             # if not training data set, use the first shard for valid and test
             paths = paths[:1]
         data_path = paths[(epoch - 1) % len(paths)]
@@ -353,15 +356,15 @@ class SpeechRecognitionHybridTask(FairseqTask):
             split,
             self.dictionary,
             combine=combine,
-            upsample_primary=self.args.upsample_primary,
-            num_buckets=self.args.num_batch_buckets,
-            shuffle=(split != getattr(self.args, "gen_subset", None)),
-            pad_to_multiple=self.args.required_seq_len_multiple,
-            lf_mmi=(self.args.criterion == "lattice_free_mmi"),
-            seed=self.args.seed,
+            upsample_primary=self.cfg.task.upsample_primary,
+            num_buckets=self.cfg.task.num_batch_buckets,
+            shuffle=(split != self.cfg.dataset.gen_subset),
+            pad_to_multiple=self.cfg.dataset.required_seq_len_multiple,
+            lf_mmi=(self.cfg.criterion._name == "lattice_free_mmi"),
+            seed=self.cfg.common.seed,
             specaugment_config=self.specaugment_config,
             chunk_width=None if self.training_stage
-            and split in self.args.valid_subset.split(",")
+            and split in self.cfg.dataset.valid_subset.split(",")
             else self.chunk_width,
             chunk_left_context=self.chunk_left_context,
             chunk_right_context=self.chunk_right_context,
@@ -376,16 +379,15 @@ class SpeechRecognitionHybridTask(FairseqTask):
         else:
             self.feat_dim = src_dataset.feat_dim
 
-    def build_generator(self, models, args):
-        if args.score_reference:
-            args.score_reference = False
+    def build_generator(self, models, cfg: GenerationConfig):
+        if cfg.score_reference:
+            cfg.score_reference = False
             logger.warning(
                 "--score-reference is not applicable to speech recognition, ignoring it."
             )
         from espresso.tools.generate_log_probs_for_decoding import GenerateLogProbsForDecoding
 
-        apply_log_softmax = getattr(args, "apply_log_softmax", False)
-        return GenerateLogProbsForDecoding(models, apply_log_softmax=apply_log_softmax)
+        return GenerateLogProbsForDecoding(models, apply_log_softmax=cfg.apply_log_softmax)
 
     def build_dataset_for_inference(self, src_tokens, src_lengths):
         return AsrChainDataset(src_tokens, src_lengths)
@@ -418,7 +420,7 @@ class SpeechRecognitionHybridTask(FairseqTask):
 
     def max_positions(self):
         """Return the max sentence length allowed by the task."""
-        return (self.args.max_source_positions, self.args.max_target_positions)
+        return (self.cfg.task.max_source_positions, self.cfg.task.max_target_positions)
 
     @property
     def target_dictionary(self):

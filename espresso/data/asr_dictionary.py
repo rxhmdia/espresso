@@ -7,6 +7,7 @@ import torch
 
 from fairseq.data import Dictionary, encoders
 from fairseq.file_io import PathManager
+from omegaconf import DictConfig
 
 # will automatically load modules defined from there
 from espresso.data import encoders as encoders_espresso
@@ -78,7 +79,7 @@ class AsrDictionary(Dictionary):
             except UnicodeError:
                 raise Exception(
                     "Incorrect encoding detected in {}, please "
-                    "rebuild the dataset".format(f)
+                    "rebuild the dataset".format(fd)
                 )
 
             for sym in non_lang_syms:
@@ -94,17 +95,14 @@ class AsrDictionary(Dictionary):
         t[-1] = self.eos()
         return t
 
-    def build_tokenizer(self, args):
-        self.tokenizer = encoders.build_tokenizer(args)
+    def build_tokenizer(self, cfg: DictConfig):
+        self.tokenizer = encoders.build_tokenizer(cfg.tokenizer)
 
-    def build_bpe(self, args):
+    def build_bpe(self, cfg: DictConfig):
         if args.bpe == "characters_asr":
-            self.bpe = encoders.build_bpe(
-                args, space_symbol=self.space_word, ends_with_space=True,
-                non_lang_syms=self.non_lang_syms,
-            )
-        else:
-            self.bpe = encoders.build_bpe(args)
+            cfg.bpe.space_symbol = self.space_word
+            cfg.bpe.non_lang_syms = self.non_lang_syms
+        self.bpe = encoders.build_bpe(cfg.bpe)
 
     def wordpiece_encode(self, x):
         if self.tokenizer is not None:

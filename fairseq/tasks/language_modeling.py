@@ -81,16 +81,16 @@ class LanguageModelingConfig(FairseqDataclass):
         default="",
         metadata={
             "help": "comma-separated list of dataset splits to apply shortening to, "
-            'e.g., "train,valid" (default: all dataset splits)'
+            "e.g., \"train,valid\" (default: all dataset splits)"
         },
     )
     # TODO common vars below add to parent
-    seed: int = II("params.common.seed")
+    seed: int = II("common.seed")
     dataset_impl: Optional[ChoiceEnum(get_available_dataset_impl())] = II(
         "params.dataset.dataset_impl"
     )
-    data_buffer_size: int = II("params.dataset.data_buffer_size")
-    tpu: bool = II("params.common.tpu")
+    data_buffer_size: int = II("dataset.data_buffer_size")
+    tpu: bool = II("common.tpu")
 
 
 @register_task("language_modeling", dataclass=LanguageModelingConfig)
