@@ -183,8 +183,8 @@ class LatticeFreeMMICriterion(FairseqCriterion):
         except ImportError:
             raise ImportError("Please install OpenFST and PyChain by `make openfst pychain` after entering espresso/tools")
 
-        encoder_out = net_output.encoder_out.transpose(0, 1)  # T x B x V -> B x T x V
-        out_lengths = net_output.src_lengths.long()  # B
+        encoder_out = net_output["encoder_out"][0].transpose(0, 1)  # T x B x V -> B x T x V
+        out_lengths = net_output["src_lengths"][0].long()  # B
         den_graphs = ChainGraphBatch(self.den_graph, sample["nsentences"])
         if self.xent_regularize > 0.0:
             den_objf = ChainFunction.apply(encoder_out, out_lengths, den_graphs, self.leaky_hmm_coefficient)
@@ -202,7 +202,10 @@ class LatticeFreeMMICriterion(FairseqCriterion):
             nll_loss = loss.clone().detach()
 
         if self.output_l2_regularize > 0.0:
-            encoder_padding_mask = net_output.encoder_padding_mask
+            encoder_padding_mask = (
+                net_output["encoder_padding_mask"][0] if len(net_output["encoder_padding_mask"]) > 0
+                else None
+            )
             encoder_out_squared = encoder_out.pow(2.0)
             if encoder_padding_mask is not None:
                 pad_mask = encoder_padding_mask.transpose(0, 1).unsqueeze(-1)  # T x B -> B x T x 1
